@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo install expo-router nativewind tailwindcss react-native-reanimated react-native-safe-area-context)",
+      "Bash(sudo npm cache clean --force)",
+      "Bash(npm install --no-cache expo-router nativewind tailwindcss react-native-reanimated react-native-safe-area-context @supabase/supabase-js)",
+      "Bash(npm install expo-router nativewind tailwindcss react-native-reanimated react-native-safe-area-context @supabase/supabase-js)",
+      "Bash(npm install --cache /tmp/npm-cache-eltin expo-router nativewind tailwindcss react-native-reanimated react-native-safe-area-context @supabase/supabase-js)",
+      "Bash(npm start)",
+      "Bash(open \"http://localhost:8081\")",
+      "Bash(npm run web)",
+      "Bash(npm install react-native-web react-dom @expo/metro-runtime --cache /tmp/npm-cache-eltin)",
+      "Bash(npm install react-native-web react-dom @expo/metro-runtime --cache /tmp/npm-cache-eltin --legacy-peer-deps)",
+      "Bash(curl -s \"http://localhost:8081\")",
+      "Bash(osascript -e ':*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx expo start --web --clear)",
+      "Bash(brew install gh)",
+      "Bash(curl -sL \"https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_macOS_arm64.tar.gz\" -o /tmp/gh.tar.gz)",
+      "Bash(tar -xzf /tmp/gh.tar.gz -C /tmp)",
+      "Bash(sudo mv /tmp/gh_2.65.0_macOS_arm64/bin/gh /usr/local/bin/gh)",
+      "Bash(gh --version)",
+      "Bash(curl -sI \"https://github.com/cli/cli/releases/download/v2.65.0/gh_2.65.0_macOS_arm64.tar.gz\")",
+      "Bash(curl -s \"https://api.github.com/repos/cli/cli/releases/latest\")",
+      "Bash(python3 -c \"import sys,json; r=json.load\\(sys.stdin\\); [print\\(a[''name''], a[''browser_download_url'']\\) for a in r[''assets''] if ''macOS'' in a[''name''] and ''arm64'' in a[''name'']]\")",
+      "Bash(git add .)"
+    ]
+  }
+}
