@@ -4,6 +4,26 @@
 
 ---
 
+## Telas
+
+<div align="center">
+
+| Dashboard | Calculadora |
+|:---------:|:-----------:|
+| <img src="assets/screenshots/dashboard.png" width="220"/> | <img src="assets/screenshots/calculadora.png" width="220"/> |
+
+| Filamentos | Projetos |
+|:----------:|:--------:|
+| <img src="assets/screenshots/filamentos.png" width="220"/> | <img src="assets/screenshots/projetos.png" width="220"/> |
+
+| Modal — Novo Filamento |
+|:----------------------:|
+| <img src="assets/screenshots/modal-filamento.png" width="220"/> |
+
+</div>
+
+---
+
 ## Sobre o Projeto
 
 O **PrintFlow** nasceu da necessidade real de quem trabalha com impressão 3D e precisa controlar custos, estoque de filamentos e projetos de forma profissional.
@@ -19,44 +39,26 @@ A maioria dos makers controla tudo em planilhas ou no "feeling" — o PrintFlow 
 
 ---
 
-## Telas
+## Funcionalidades
 
 ### Dashboard — Visão Geral
-A tela inicial mostra os KPIs mais importantes do mês: faturamento, lucro líquido, peças produzidas e filamento consumido. Também exibe o ranking das peças mais rentáveis e as impressões mais recentes.
-
-<!-- screenshot: app/(tabs)/index.tsx -->
-> 📸 *Dashboard com KPIs, Top Peças e Impressões Recentes*
-
----
+A tela inicial mostra os KPIs mais importantes do mês: faturamento, lucro líquido, peças produzidas e filamento consumido. Também exibe o ranking das peças mais rentáveis (com barra de margem) e as impressões mais recentes.
 
 ### Calculadora de Precificação
-Preencha o peso da peça, o preço do rolo, o tempo de impressão e a margem desejada — o app calcula automaticamente todos os custos (filamento, energia, mão de obra, desperdício) e o preço de venda ideal.
+Preencha o peso da peça, o preço do rolo, o tempo de impressão e a margem desejada — o app calcula automaticamente todos os custos e o preço de venda ideal em tempo real.
 
-<!-- screenshot: app/(tabs)/calculadora.tsx -->
-> 📸 *Calculadora com detalhamento de custos e resultado em tempo real*
-
-**Fórmula de precificação:**
+**Fórmula:**
 ```
 Custo Total = Filamento + Energia + Mão de Obra + Desperdício (8%)
 Preço de Venda = Custo Total / (1 - Margem%)
 Lucro = Preço de Venda - Custo Total
 ```
 
----
-
 ### Filamentos — Controle de Estoque
-Visualize todos os seus rolos com barra de progresso do quanto resta, custo por grama e status (OK / Baixo / Crítico). Adicione novos rolos com tipo, cor e peso pelo botão `+ Novo`.
-
-<!-- screenshot: app/(tabs)/filamentos.tsx -->
-> 📸 *Lista de filamentos com barras de progresso e modal de cadastro*
-
----
+Visualize todos os seus rolos com barra de progresso do quanto resta, custo por grama e status automático (OK / Baixo / Crítico). Adicione novos rolos com tipo, cor e peso pelo botão `+ Novo`.
 
 ### Projetos & Impressões
-Gerencie todos os seus projetos com filtros por status (Imprimindo, Em Fila, Concluído, Falhou). Cadastre novos projetos informando emoji, filamento usado, tempo, custo e preço de venda.
-
-<!-- screenshot: app/(tabs)/projetos.tsx -->
-> 📸 *Lista de projetos com filtros horizontais e modal de cadastro*
+Gerencie todos os seus projetos com filtros por status (Imprimindo, Em Fila, Concluído, Falhou). Cadastre novos projetos escolhendo emoji, filamento usado, tempo, custo e preço de venda.
 
 ---
 
@@ -85,6 +87,8 @@ printflow/
 │       ├── calculadora.tsx      # Calculadora de precificação
 │       ├── filamentos.tsx       # Estoque de filamentos
 │       └── projetos.tsx         # Projetos e impressões
+├── assets/
+│   └── screenshots/             # Prints das telas
 ├── global.css                   # Estilos base do Tailwind/NativeWind
 ├── tailwind.config.js           # Paleta de cores customizada
 ├── babel.config.js              # Config do Babel com NativeWind
