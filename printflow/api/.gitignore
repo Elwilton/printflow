@@ -1,0 +1,16 @@
+## .NET build artifacts
+bin/
+obj/
+*.user
+
+## Visual Studio / Rider cache
+.vs/
+.idea/
+
+## Banco de dados SQLite local (gerado em runtime)
+*.db
+*.db-shm
+*.db-wal
+
+## Secrets e configurações locais
+appsettings.*.local.json

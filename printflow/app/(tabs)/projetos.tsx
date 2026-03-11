@@ -1,61 +1,60 @@
 // TELA: Projetos & Impressões
 //
 // Conceitos novos nesta tela:
-// - Modal com formulário: mesmo padrão do Filamentos, mas com campos diferentes.
-// - useState editável: agora usamos setProjetos para adicionar à lista.
-// - Seletor de status: pills interativos para escolher o status do projeto.
-// - Seletor de emoji: grid de emojis para identificar visualmente o projeto.
+// - useEffect para carregar dados da API ao montar a tela.
+// - Os campos custo/venda/tempo agora são numéricos (alinhados com a API).
+// - formatMoeda e formatTempo: funções utilitárias do services/api.ts.
 
-import { useState } from "react";
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  projetosApi,
+  type Projeto,
+  formatMoeda,
+  formatTempo,
+} from "../../services/api";
 
-interface Projeto {
-  id: number;
-  nome: string;
-  status: "Concluído" | "Imprimindo" | "Em Fila" | "Falhou";
-  filamento: string;
-  tempo: string;
-  custo: string;
-  venda: string;
-  data: string;
-  emoji: string;
-}
-
-const projetosIniciais: Projeto[] = [
-  { id: 1, nome: "Case iPhone 15 Pro", status: "Concluído", filamento: "PLA+ Preto", tempo: "2h 15min", custo: "R$8,40", venda: "R$25,00", data: "Hoje", emoji: "📱" },
-  { id: 2, nome: "Suporte Monitor", status: "Imprimindo", filamento: "PETG Azul", tempo: "6h 30min", custo: "R$22,00", venda: "R$55,00", data: "Hoje", emoji: "🖥️" },
-  { id: 3, nome: "Miniatura Dragão", status: "Em Fila", filamento: "PLA Branco", tempo: "8h 00min", custo: "R$18,00", venda: "R$60,00", data: "Amanhã", emoji: "🐉" },
-  { id: 4, nome: "Tampa Caixa", status: "Falhou", filamento: "TPU Roxo", tempo: "1h 20min", custo: "R$5,50", venda: "-", data: "Ontem", emoji: "📦" },
-];
-
-const statusStyles: Record<Projeto["status"], { color: string; bg: string }> = {
+const statusStyles: Record<string, { color: string; bg: string }> = {
   "Concluído": { color: "#2ECC71", bg: "rgba(46,204,113,0.15)" },
   "Imprimindo": { color: "#F1C40F", bg: "rgba(241,196,15,0.15)" },
-  "Em Fila": { color: "#3B82F6", bg: "rgba(59,130,246,0.15)" },
-  "Falhou": { color: "#E74C3C", bg: "rgba(231,76,60,0.15)" },
+  "Em Fila":   { color: "#3B82F6", bg: "rgba(59,130,246,0.15)" },
+  "Falhou":    { color: "#E74C3C", bg: "rgba(231,76,60,0.15)" },
 };
 
 const filtros = ["Todos", "Imprimindo", "Em Fila", "Concluído", "Falhou"] as const;
-
-// Status disponíveis para novos projetos
-const STATUS_OPCOES: Projeto["status"][] = ["Em Fila", "Imprimindo", "Concluído", "Falhou"];
-
-// Emojis sugeridos para categorizar o projeto visualmente
+const STATUS_OPCOES = ["Em Fila", "Imprimindo", "Concluído", "Falhou"];
 const EMOJIS = ["📱", "🖥️", "🐉", "📦", "🔧", "🎮", "🏠", "🚗", "✈️", "🤖", "💡", "🔑"];
 
+function formatData(iso: string): string {
+  const data = new Date(iso);
+  const hoje = new Date();
+  const diff = Math.floor((hoje.getTime() - data.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Ontem";
+  return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 export default function Projetos() {
-  const [projetos, setProjetos] = useState<Projeto[]>(projetosIniciais);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtroAtivo, setFiltroAtivo] = useState<string>("Todos");
   const [modalVisible, setModalVisible] = useState(false);
 
   // Estado do formulário
   const [nome, setNome] = useState("");
-  const [filamento, setFilamento] = useState("");
   const [tempo, setTempo] = useState("");
   const [custo, setCusto] = useState("");
   const [venda, setVenda] = useState("");
-  const [statusSelecionado, setStatusSelecionado] = useState<Projeto["status"]>("Em Fila");
+  const [statusSelecionado, setStatusSelecionado] = useState("Em Fila");
   const [emojiSelecionado, setEmojiSelecionado] = useState("📦");
 
   const projetosFiltrados =
@@ -63,38 +62,50 @@ export default function Projetos() {
       ? projetos
       : projetos.filter((p) => p.status === filtroAtivo);
 
-  function salvar() {
+  useEffect(() => {
+    carregarProjetos();
+  }, []);
+
+  async function carregarProjetos() {
+    try {
+      setLoading(true);
+      const dados = await projetosApi.getAll();
+      setProjetos(dados);
+    } catch (err) {
+      console.error("Erro ao carregar projetos:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function salvar() {
     if (!nome.trim()) return;
 
-    // Formata o custo: se o usuário digitou apenas número, adiciona o prefixo R$
-    const custoFormatado = custo.trim()
-      ? custo.startsWith("R$") ? custo : `R$${custo}`
-      : "R$0,00";
+    const tempoNum = parseFloat(tempo.replace(",", ".")) || 0;
+    const custoNum = parseFloat(custo.replace(",", ".")) || 0;
+    const vendaNum = parseFloat(venda.replace(",", ".")) || 0;
 
-    const vendaFormatada = venda.trim()
-      ? venda.startsWith("R$") ? venda : `R$${venda}`
-      : "-";
+    try {
+      const novoProjeto = await projetosApi.create({
+        nome: nome.trim(),
+        emoji: emojiSelecionado,
+        status: statusSelecionado,
+        tempoHoras: tempoNum,
+        custo: custoNum,
+        venda: vendaNum,
+        filamentoId: null,
+      });
 
-    const novoProjeto: Projeto = {
-      id: Date.now(),
-      nome: nome.trim(),
-      status: statusSelecionado,
-      filamento: filamento.trim() || "Não informado",
-      tempo: tempo.trim() || "-",
-      custo: custoFormatado,
-      venda: vendaFormatada,
-      data: "Hoje",
-      emoji: emojiSelecionado,
-    };
-
-    setProjetos((prev) => [novoProjeto, ...prev]);
-    fecharModal();
+      setProjetos((prev) => [novoProjeto, ...prev]);
+      fecharModal();
+    } catch (err) {
+      console.error("Erro ao salvar projeto:", err);
+    }
   }
 
   function fecharModal() {
     setModalVisible(false);
     setNome("");
-    setFilamento("");
     setTempo("");
     setCusto("");
     setVenda("");
@@ -118,7 +129,7 @@ export default function Projetos() {
         </View>
       </View>
 
-      {/* Título + botão ficam fora do ScrollView principal para não sumir ao rolar */}
+      {/* Título + botão */}
       <View className="flex-row items-center justify-between px-5 mb-4">
         <Text
           className="text-[26px] font-extrabold text-text-main"
@@ -173,7 +184,14 @@ export default function Projetos() {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {projetosFiltrados.length === 0 ? (
+        {loading ? (
+          <View className="items-center py-16">
+            <ActivityIndicator color="#FF6B2B" size="large" />
+            <Text className="text-text-muted text-[13px] mt-3">
+              Carregando projetos...
+            </Text>
+          </View>
+        ) : projetosFiltrados.length === 0 ? (
           <View className="items-center py-16">
             <Text className="text-4xl mb-3">🔍</Text>
             <Text className="text-text-muted text-[14px] font-semibold">
@@ -182,7 +200,10 @@ export default function Projetos() {
           </View>
         ) : (
           projetosFiltrados.map((p) => {
-            const s = statusStyles[p.status];
+            const s = statusStyles[p.status] ?? { color: "#6B6B80", bg: "rgba(107,107,128,0.15)" };
+            const tempoLabel = p.tempoHoras > 0 ? formatTempo(p.tempoHoras) : "-";
+            const vendaLabel = p.venda > 0 ? formatMoeda(p.venda) : "-";
+
             return (
               <View key={p.id} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
 
@@ -195,7 +216,7 @@ export default function Projetos() {
                         {p.nome}
                       </Text>
                       <Text className="text-[11px] text-text-muted mt-[2px]">
-                        🧵 {p.filamento} · ⏱ {p.tempo}
+                        ⏱ {tempoLabel}
                       </Text>
                     </View>
                   </View>
@@ -218,13 +239,17 @@ export default function Projetos() {
                     <Text className="text-[10px] text-text-muted font-semibold uppercase mb-1" style={{ letterSpacing: 0.5 }}>
                       Custo
                     </Text>
-                    <Text className="text-[14px] font-bold text-danger">{p.custo}</Text>
+                    <Text className="text-[14px] font-bold text-danger">
+                      {formatMoeda(p.custo)}
+                    </Text>
                   </View>
                   <View className="items-center">
                     <Text className="text-[10px] text-text-muted font-semibold uppercase mb-1" style={{ letterSpacing: 0.5 }}>
                       Data
                     </Text>
-                    <Text className="text-[14px] font-bold text-text-main">{p.data}</Text>
+                    <Text className="text-[14px] font-bold text-text-main">
+                      {formatData(p.criadoEm)}
+                    </Text>
                   </View>
                   <View className="items-end">
                     <Text className="text-[10px] text-text-muted font-semibold uppercase mb-1" style={{ letterSpacing: 0.5 }}>
@@ -232,9 +257,9 @@ export default function Projetos() {
                     </Text>
                     <Text
                       className="text-[14px] font-bold"
-                      style={{ color: p.venda === "-" ? "#6B6B80" : "#2ECC71" }}
+                      style={{ color: p.venda > 0 ? "#2ECC71" : "#6B6B80" }}
                     >
-                      {p.venda}
+                      {vendaLabel}
                     </Text>
                   </View>
                 </View>
@@ -297,7 +322,7 @@ export default function Projetos() {
             <View className="flex-row flex-wrap gap-2 mb-4">
               {STATUS_OPCOES.map((s) => {
                 const ativo = statusSelecionado === s;
-                const cor = statusStyles[s].color;
+                const cor = statusStyles[s]?.color ?? "#6B6B80";
                 return (
                   <TouchableOpacity
                     key={s}
@@ -347,27 +372,16 @@ export default function Projetos() {
               })}
             </View>
 
-            {/* Filamento */}
-            <Text className="text-[12px] font-semibold text-text-muted mb-[6px]">
-              Filamento usado
-            </Text>
-            <TextInput
-              className="bg-bg border border-separator rounded-xl px-[14px] py-3 text-text-main text-[14px] mb-4"
-              placeholder="Ex: PLA+ Preto"
-              placeholderTextColor="#6B6B80"
-              value={filamento}
-              onChangeText={setFilamento}
-            />
-
             {/* Tempo + Custo lado a lado */}
             <View className="flex-row gap-3 mb-4">
               <View className="flex-1">
                 <Text className="text-[12px] font-semibold text-text-muted mb-[6px]">
-                  Tempo de impressão
+                  Tempo (horas)
                 </Text>
                 <TextInput
                   className="bg-bg border border-separator rounded-xl px-[14px] py-3 text-text-main text-[14px]"
-                  placeholder="Ex: 3h 20min"
+                  keyboardType="decimal-pad"
+                  placeholder="Ex: 2.5"
                   placeholderTextColor="#6B6B80"
                   value={tempo}
                   onChangeText={setTempo}
@@ -380,7 +394,7 @@ export default function Projetos() {
                 <TextInput
                   className="bg-bg border border-separator rounded-xl px-[14px] py-3 text-text-main text-[14px]"
                   keyboardType="decimal-pad"
-                  placeholder="Ex: 12,50"
+                  placeholder="Ex: 12.50"
                   placeholderTextColor="#6B6B80"
                   value={custo}
                   onChangeText={setCusto}
@@ -395,7 +409,7 @@ export default function Projetos() {
             <TextInput
               className="bg-bg border border-separator rounded-xl px-[14px] py-3 text-text-main text-[14px] mb-6"
               keyboardType="decimal-pad"
-              placeholder="Ex: 35,00 (deixe vazio se não vendeu)"
+              placeholder="Ex: 35.00 (deixe vazio se não vendeu)"
               placeholderTextColor="#6B6B80"
               value={venda}
               onChangeText={setVenda}

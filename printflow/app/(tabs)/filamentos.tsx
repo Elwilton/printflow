@@ -1,15 +1,14 @@
 // TELA: Filamentos
 //
 // Conceitos novos nesta tela:
-// - Modal: componente nativo para sobrepor conteúdo na tela (como um dialog/drawer).
-//   animationType="slide" faz ele deslizar de baixo para cima.
-//   transparent + fundo escuro cria o efeito de "bottom sheet".
-// - useState com array: a lista de rolos agora vive no estado,
-//   então ao adicionar um rolo, o componente re-renderiza automaticamente.
-// - Date.now(): gera um id único baseado no timestamp atual.
+// - useEffect: hook do React que executa código ao montar o componente.
+//   Aqui usamos para carregar os dados da API assim que a tela abre.
+// - fetch com async/await: chamada HTTP para a API .NET local.
+// - Estado de loading: enquanto os dados chegam, mostramos uma mensagem.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   Text,
@@ -18,23 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-interface Rolo {
-  id: number;
-  nome: string;
-  tipo: string;
-  peso: number;   // gramas restantes
-  total: number;  // gramas totais do rolo
-  preco: number;  // preço em R$
-  cor: string;    // cor hex do filamento
-}
-
-const rolosIniciais: Rolo[] = [
-  { id: 1, nome: "eSUN PLA+ Preto", tipo: "PLA+", peso: 740, total: 1000, preco: 89, cor: "#444444" },
-  { id: 2, nome: "Bambu PLA Branco", tipo: "PLA", peso: 320, total: 1000, preco: 105, cor: "#E8E8E8" },
-  { id: 3, nome: "eSUN PETG Azul", tipo: "PETG", peso: 890, total: 1000, preco: 98, cor: "#3B82F6" },
-  { id: 4, nome: "Creality TPU", tipo: "TPU", peso: 150, total: 500, preco: 75, cor: "#A855F7" },
-];
+import { filamentosApi, type Filamento } from "../../services/api";
 
 // Opções de tipo de filamento
 const TIPOS = ["PLA", "PLA+", "PETG", "TPU", "ABS", "ASA"];
@@ -72,8 +55,8 @@ function getStatusLabel(pct: number) {
 }
 
 export default function Filamentos() {
-  // Agora rolos é um estado mutável — podemos adicionar itens
-  const [rolos, setRolos] = useState<Rolo[]>(rolosIniciais);
+  const [rolos, setRolos] = useState<Filamento[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
 
   // Estado do formulário de novo rolo
@@ -83,31 +66,49 @@ export default function Filamentos() {
   const [preco, setPreco] = useState("");
   const [corSelecionada, setCorSelecionada] = useState("#444444");
 
-  function salvar() {
-    // Validação simples: nome e preço são obrigatórios
+  // Carrega os filamentos da API ao montar a tela
+  useEffect(() => {
+    carregarFilamentos();
+  }, []);
+
+  async function carregarFilamentos() {
+    try {
+      setLoading(true);
+      const dados = await filamentosApi.getAll();
+      setRolos(dados);
+    } catch (err) {
+      console.error("Erro ao carregar filamentos:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function salvar() {
     if (!nome.trim() || !preco.trim()) return;
 
     const pesoNum = parseFloat(pesoTotal) || 1000;
     const precoNum = parseFloat(preco.replace(",", ".")) || 0;
 
-    const novoRolo: Rolo = {
-      id: Date.now(), // timestamp como id único temporário
-      nome: nome.trim(),
-      tipo: tipoSelecionado,
-      peso: pesoNum,
-      total: pesoNum,
-      preco: precoNum,
-      cor: corSelecionada,
-    };
+    try {
+      const novoRolo = await filamentosApi.create({
+        nome: nome.trim(),
+        tipo: tipoSelecionado,
+        peso: pesoNum,
+        total: pesoNum,
+        preco: precoNum,
+        cor: corSelecionada,
+      });
 
-    // Adiciona no início da lista
-    setRolos((prev) => [novoRolo, ...prev]);
-    fecharModal();
+      // Adiciona no início da lista sem precisar recarregar tudo
+      setRolos((prev) => [novoRolo, ...prev]);
+      fecharModal();
+    } catch (err) {
+      console.error("Erro ao salvar filamento:", err);
+    }
   }
 
   function fecharModal() {
     setModalVisible(false);
-    // Reseta o formulário ao fechar
     setNome("");
     setTipoSelecionado("PLA");
     setPesoTotal("1000");
@@ -155,77 +156,95 @@ export default function Filamentos() {
           </TouchableOpacity>
         </View>
 
-        {/* ── LISTA DE ROLOS ── */}
-        {rolos.map((r) => {
-          const pct = Math.round((r.peso / r.total) * 100);
-          const sc = getStatusColor(pct);
-          const sb = getStatusBg(pct);
-          const custGrama = (r.preco / r.total).toFixed(3);
+        {/* ── LOADING ── */}
+        {loading ? (
+          <View className="items-center py-16">
+            <ActivityIndicator color="#FF6B2B" size="large" />
+            <Text className="text-text-muted text-[13px] mt-3">
+              Carregando filamentos...
+            </Text>
+          </View>
+        ) : rolos.length === 0 ? (
+          <View className="items-center py-16">
+            <Text className="text-4xl mb-3">🧵</Text>
+            <Text className="text-text-muted text-[14px] font-semibold">
+              Nenhum filamento cadastrado
+            </Text>
+            <Text className="text-text-muted text-[12px] mt-1">
+              Toque em + Novo para adicionar
+            </Text>
+          </View>
+        ) : (
+          /* ── LISTA DE ROLOS ── */
+          rolos.map((r) => {
+            const pct = Math.round((r.peso / r.total) * 100);
+            const sc = getStatusColor(pct);
+            const sb = getStatusBg(pct);
+            const custGrama = (r.preco / r.total).toFixed(3);
 
-          return (
-            <View key={r.id} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
+            return (
+              <View key={r.id} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
 
-              {/* Linha superior: cor + nome + status */}
-              <View className="flex-row items-center gap-3 mb-3">
-                <View
-                  className="w-4 h-4 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor: r.cor,
-                    borderWidth: 1.5,
-                    borderColor: "rgba(255,255,255,0.2)",
-                  }}
-                />
-                <View className="flex-1">
-                  <Text className="font-bold text-[14px] text-text-main">{r.nome}</Text>
-                  <Text className="text-[11px] text-text-muted mt-[1px]">
-                    R${custGrama}/g · {r.tipo}
+                {/* Linha superior: cor + nome + status */}
+                <View className="flex-row items-center gap-3 mb-3">
+                  <View
+                    className="w-4 h-4 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: r.cor,
+                      borderWidth: 1.5,
+                      borderColor: "rgba(255,255,255,0.2)",
+                    }}
+                  />
+                  <View className="flex-1">
+                    <Text className="font-bold text-[14px] text-text-main">{r.nome}</Text>
+                    <Text className="text-[11px] text-text-muted mt-[1px]">
+                      R${custGrama}/g · {r.tipo}
+                    </Text>
+                  </View>
+                  <View
+                    className="rounded-full px-[10px] py-[3px]"
+                    style={{ backgroundColor: sb }}
+                  >
+                    <Text className="text-[11px] font-bold" style={{ color: sc }}>
+                      {getStatusLabel(pct)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Peso restante */}
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-[12px] text-text-muted">Restante</Text>
+                  <Text className="text-[13px] font-bold text-text-main">
+                    {r.peso}g{" "}
+                    <Text className="font-normal text-text-muted">/ {r.total}g</Text>
                   </Text>
                 </View>
-                <View
-                  className="rounded-full px-[10px] py-[3px]"
-                  style={{ backgroundColor: sb }}
+
+                {/* Barra de progresso */}
+                <View className="h-2 rounded-full bg-separator overflow-hidden">
+                  <View
+                    style={{
+                      height: 8,
+                      width: `${pct}%`,
+                      backgroundColor: sc,
+                      borderRadius: 4,
+                    }}
+                  />
+                </View>
+
+                <Text
+                  className="text-[11px] font-bold mt-[6px] text-right"
+                  style={{ color: sc }}
                 >
-                  <Text className="text-[11px] font-bold" style={{ color: sc }}>
-                    {getStatusLabel(pct)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Peso restante */}
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-[12px] text-text-muted">Restante</Text>
-                <Text className="text-[13px] font-bold text-text-main">
-                  {r.peso}g{" "}
-                  <Text className="font-normal text-text-muted">/ {r.total}g</Text>
+                  {pct}% restante
                 </Text>
               </View>
-
-              {/* Barra de progresso */}
-              <View className="h-2 rounded-full bg-separator overflow-hidden">
-                <View
-                  style={{
-                    height: 8,
-                    width: `${pct}%`,
-                    backgroundColor: sc,
-                    borderRadius: 4,
-                  }}
-                />
-              </View>
-
-              <Text
-                className="text-[11px] font-bold mt-[6px] text-right"
-                style={{ color: sc }}
-              >
-                {pct}% restante
-              </Text>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
       </ScrollView>
 
       {/* ── MODAL: NOVO FILAMENTO ── */}
-      {/* transparent={true} + fundo escuro = efeito de overlay */}
-      {/* animationType="slide" = entra deslizando de baixo */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -235,7 +254,6 @@ export default function Filamentos() {
         <View
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}
         >
-          {/* O "drawer" em si — sobe do fundo */}
           <View
             style={{
               backgroundColor: "#13131A",

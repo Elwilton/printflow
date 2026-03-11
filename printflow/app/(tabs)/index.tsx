@@ -1,55 +1,69 @@
 // TELA: Dashboard (Início)
 //
 // Conceitos importantes desta tela:
-// - SafeAreaView: garante que o conteúdo nao fica atrás do notch/câmera do celular
-// - ScrollView: permite rolar o conteúdo, como overflow-y: auto no web
-// - View: equivalente à <div> no web
-// - Text: equivalente ao <p>, <span>, <h1> etc. no web. TODO texto precisa estar dentro de <Text>
-// - className: usamos classes Tailwind graças ao NativeWind
-// - style={{}}: para estilos dinâmicos (cores que mudam por item, por ex.)
+// - useEffect + useState: carrega os dados do dashboard da API ao montar.
+// - DashboardData: tipo importado do services/api.ts.
+// - Dados reais substituem os estáticos anteriores.
 
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { dashboardApi, type DashboardData, formatMoeda, formatTempo } from "../../services/api";
 
-// Dados estáticos das seções (mais tarde virão do Supabase)
-const kpis = [
-  { label: "Faturamento", value: "R$1.240", icon: "💰", color: "#2ECC71", delta: "+18%" },
-  { label: "Lucro Líquido", value: "R$680", icon: "📈", color: "#FF6B2B", delta: "+12%" },
-  { label: "Peças Feitas", value: "34", icon: "🖨️", color: "#3B82F6", delta: "este mês" },
-  { label: "Filamento", value: "1.2kg", icon: "🧵", color: "#F1C40F", delta: "consumido" },
+// Cores para o top de peças (atribuídas por índice)
+const TOP_CORES = ["#FF6B2B", "#3B82F6", "#A855F7", "#2ECC71", "#F1C40F"];
+
+const statusColors: Record<string, { color: string; bg: string }> = {
+  "Concluído": { color: "#2ECC71", bg: "rgba(46,204,113,0.15)" },
+  "Imprimindo": { color: "#F1C40F", bg: "rgba(241,196,15,0.15)" },
+  "Em Fila":   { color: "#3B82F6", bg: "rgba(59,130,246,0.15)" },
+  "Falhou":    { color: "#E74C3C", bg: "rgba(231,76,60,0.15)" },
+};
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-const topPecas = [
-  { name: "Suporte Parede", lucro: "R$18,50", margem: 72, cor: "#FF6B2B" },
-  { name: "Case iPhone 15", lucro: "R$14,00", margem: 58, cor: "#3B82F6" },
-  { name: "Miniatura Dragon", lucro: "R$22,00", margem: 66, cor: "#A855F7" },
-];
-
-const impressoesRecentes = [
-  { name: "Engrenagem v3", status: "Concluído", time: "3h 40min", statusColor: "#2ECC71", statusBg: "rgba(46,204,113,0.15)" },
-  { name: "Base Robô", status: "Imprimindo", time: "2h restantes", statusColor: "#F1C40F", statusBg: "rgba(241,196,15,0.15)" },
-  { name: "Tampa Eletrônica", status: "Falhou", time: "1h 10min", statusColor: "#E74C3C", statusBg: "rgba(231,76,60,0.15)" },
-];
-
-// Componente reutilizável para os badges coloridos de status.
-// Separar em componente próprio evita repetição de código.
 function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
-    <View
-      className="rounded-full px-[10px] py-[3px]"
-      style={{ backgroundColor: bg }}
-    >
-      <Text className="text-[11px] font-bold" style={{ color }}>
-        {label}
-      </Text>
+    <View className="rounded-full px-[10px] py-[3px]" style={{ backgroundColor: bg }}>
+      <Text className="text-[11px] font-bold" style={{ color }}>{label}</Text>
     </View>
   );
 }
 
 export default function Dashboard() {
+  const [dados, setDados] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const mesAtual = MESES[new Date().getMonth()];
+
+  useEffect(() => {
+    carregarDashboard();
+  }, []);
+
+  async function carregarDashboard() {
+    try {
+      setLoading(true);
+      const resultado = await dashboardApi.get();
+      setDados(resultado);
+    } catch (err) {
+      console.error("Erro ao carregar dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const kpis = dados
+    ? [
+        { label: "Faturamento", value: formatMoeda(dados.faturamento), icon: "💰", color: "#2ECC71", delta: "este mês" },
+        { label: "Lucro Líquido", value: formatMoeda(dados.lucro), icon: "📈", color: "#FF6B2B", delta: "este mês" },
+        { label: "Peças Feitas", value: String(dados.pecas), icon: "🖨️", color: "#3B82F6", delta: "concluídas" },
+        { label: "Horas Impressas", value: formatTempo(dados.horasTotais), icon: "⏱️", color: "#F1C40F", delta: "total" },
+      ]
+    : [];
+
   return (
-    // edges={["top"]} aplica safe area só no topo.
-    // A aba inferior já cuida do espaço do tab bar.
     <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
 
       {/* ── HEADER ── */}
@@ -69,13 +83,11 @@ export default function Dashboard() {
       </View>
 
       {/* ── CONTEÚDO ROLÁVEL ── */}
-      {/* contentContainerStyle adiciona padding no final para o conteúdo nao sumir atrás do tab bar */}
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-
         {/* Saudação */}
         <View className="mb-6">
           <Text className="text-[13px] text-text-muted mb-1">Olá, Maker 👋</Text>
@@ -84,105 +96,138 @@ export default function Dashboard() {
             style={{ letterSpacing: -0.5, lineHeight: 34 }}
           >
             Visão Geral{"\n"}
-            {/* {"\n"} é a forma de quebrar linha dentro de um <Text> no React Native */}
-            <Text className="text-accent">de Março</Text>
+            <Text className="text-accent">de {mesAtual}</Text>
           </Text>
         </View>
 
-        {/* ── KPI CARDS (grid 2 colunas) ── */}
-        {/* React Native nao tem CSS Grid. Simulamos com flex-row e agrupando em pares */}
-        {[kpis.slice(0, 2), kpis.slice(2, 4)].map((row, rowIdx) => (
-          <View key={rowIdx} className="flex-row gap-[10px] mb-[10px]">
-            {row.map((k) => (
-              <View
-                key={k.label}
-                className="flex-1 bg-surface rounded-2xl p-[14px] border border-separator"
-              >
-                {/* Ícone com fundo colorido translúcido */}
-                <View
-                  className="w-[42px] h-[42px] rounded-xl items-center justify-center mb-[10px]"
-                  style={{ backgroundColor: k.color + "22" }}
-                >
-                  <Text className="text-xl">{k.icon}</Text>
-                </View>
-                <Text
-                  className="text-[22px] font-extrabold"
-                  style={{ color: k.color, letterSpacing: -0.5 }}
-                >
-                  {k.value}
-                </Text>
-                <Text className="text-[11px] text-text-muted font-semibold mt-[2px]">
-                  {k.label}
-                </Text>
-                <Text className="text-[10px] font-bold mt-1" style={{ color: k.color }}>
-                  {k.delta}
-                </Text>
-              </View>
-            ))}
+        {/* ── LOADING ── */}
+        {loading ? (
+          <View className="items-center py-16">
+            <ActivityIndicator color="#FF6B2B" size="large" />
+            <Text className="text-text-muted text-[13px] mt-3">Carregando dashboard...</Text>
           </View>
-        ))}
-
-        {/* ── TOP PEÇAS ── */}
-        <View className="mt-3 mb-7">
-          <Text
-            className="text-[11px] font-bold text-text-muted mb-3 uppercase"
-            style={{ letterSpacing: 1.5 }}
-          >
-            🏆 Peças Mais Rentáveis
-          </Text>
-          {topPecas.map((p, i) => (
-            <View key={p.name} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
-              <View className="flex-row items-center justify-between mb-[10px]">
-                <View className="flex-row items-center gap-3">
-                  <Text className="text-[18px] font-extrabold text-text-muted">
-                    #{i + 1}
-                  </Text>
-                  <View>
-                    <Text className="font-bold text-[14px] text-text-main">{p.name}</Text>
-                    <Text className="text-[11px] text-text-muted mt-[2px]">
-                      Margem: {p.margem}%
+        ) : (
+          <>
+            {/* ── KPI CARDS (grid 2 colunas) ── */}
+            {[kpis.slice(0, 2), kpis.slice(2, 4)].map((row, rowIdx) => (
+              <View key={rowIdx} className="flex-row gap-[10px] mb-[10px]">
+                {row.map((k) => (
+                  <View
+                    key={k.label}
+                    className="flex-1 bg-surface rounded-2xl p-[14px] border border-separator"
+                  >
+                    <View
+                      className="w-[42px] h-[42px] rounded-xl items-center justify-center mb-[10px]"
+                      style={{ backgroundColor: k.color + "22" }}
+                    >
+                      <Text className="text-xl">{k.icon}</Text>
+                    </View>
+                    <Text
+                      className="text-[22px] font-extrabold"
+                      style={{ color: k.color, letterSpacing: -0.5 }}
+                    >
+                      {k.value}
+                    </Text>
+                    <Text className="text-[11px] text-text-muted font-semibold mt-[2px]">
+                      {k.label}
+                    </Text>
+                    <Text className="text-[10px] font-bold mt-1" style={{ color: k.color }}>
+                      {k.delta}
                     </Text>
                   </View>
-                </View>
-                <Text className="text-[16px] font-extrabold text-success">{p.lucro}</Text>
+                ))}
               </View>
+            ))}
 
-              {/* Barra de progresso: View externa define o trilho, View interna o preenchimento */}
-              <View className="h-[6px] rounded-full bg-separator overflow-hidden">
-                <View
-                  style={{
-                    height: 6,
-                    width: `${p.margem}%`,
-                    backgroundColor: p.cor,
-                    borderRadius: 3,
-                  }}
-                />
+            {/* ── TOP PEÇAS ── */}
+            {dados && dados.topPecas.length > 0 && (
+              <View className="mt-3 mb-7">
+                <Text
+                  className="text-[11px] font-bold text-text-muted mb-3 uppercase"
+                  style={{ letterSpacing: 1.5 }}
+                >
+                  🏆 Peças Mais Rentáveis
+                </Text>
+                {dados.topPecas.map((p, i) => (
+                  <View key={p.id} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
+                    <View className="flex-row items-center justify-between mb-[10px]">
+                      <View className="flex-row items-center gap-3">
+                        <Text className="text-[18px] font-extrabold text-text-muted">
+                          #{i + 1}
+                        </Text>
+                        <View>
+                          <Text className="font-bold text-[14px] text-text-main">{p.nome}</Text>
+                          <Text className="text-[11px] text-text-muted mt-[2px]">
+                            Margem: {p.margem.toFixed(0)}%
+                          </Text>
+                        </View>
+                      </View>
+                      <Text className="text-[16px] font-extrabold text-success">
+                        {formatMoeda(p.lucro)}
+                      </Text>
+                    </View>
+                    <View className="h-[6px] rounded-full bg-separator overflow-hidden">
+                      <View
+                        style={{
+                          height: 6,
+                          width: `${Math.min(p.margem, 100)}%`,
+                          backgroundColor: TOP_CORES[i % TOP_CORES.length],
+                          borderRadius: 3,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
               </View>
-            </View>
-          ))}
-        </View>
+            )}
 
-        {/* ── IMPRESSÕES RECENTES ── */}
-        <View className="mb-4">
-          <Text
-            className="text-[11px] font-bold text-text-muted mb-3 uppercase"
-            style={{ letterSpacing: 1.5 }}
-          >
-            ⏱ Impressões Recentes
-          </Text>
-          {impressoesRecentes.map((p) => (
-            <View key={p.name} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="font-bold text-[14px] text-text-main">{p.name}</Text>
-                  <Text className="text-[11px] text-text-muted mt-[2px]">⏱ {p.time}</Text>
-                </View>
-                <Badge label={p.status} color={p.statusColor} bg={p.statusBg} />
+            {/* ── IMPRESSÕES RECENTES ── */}
+            {dados && dados.recentes.length > 0 && (
+              <View className="mb-4">
+                <Text
+                  className="text-[11px] font-bold text-text-muted mb-3 uppercase"
+                  style={{ letterSpacing: 1.5 }}
+                >
+                  ⏱ Impressões Recentes
+                </Text>
+                {dados.recentes.map((p) => {
+                  const sc = statusColors[p.status] ?? { color: "#6B6B80", bg: "rgba(107,107,128,0.15)" };
+                  return (
+                    <View key={p.id} className="bg-surface rounded-2xl p-4 border border-separator mb-[10px]">
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-3 flex-1 mr-3">
+                          <Text className="text-[22px]">{p.emoji}</Text>
+                          <View className="flex-1">
+                            <Text className="font-bold text-[14px] text-text-main" numberOfLines={1}>
+                              {p.nome}
+                            </Text>
+                            <Text className="text-[11px] text-text-muted mt-[2px]">
+                              💰 {formatMoeda(p.custo)}
+                            </Text>
+                          </View>
+                        </View>
+                        <Badge label={p.status} color={sc.color} bg={sc.bg} />
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-            </View>
-          ))}
-        </View>
+            )}
 
+            {/* Estado vazio */}
+            {dados && dados.recentes.length === 0 && (
+              <View className="items-center py-12">
+                <Text className="text-4xl mb-3">🖨️</Text>
+                <Text className="text-text-muted text-[14px] font-semibold">
+                  Nenhum projeto ainda
+                </Text>
+                <Text className="text-text-muted text-[12px] mt-1">
+                  Crie seu primeiro projeto na aba Projetos
+                </Text>
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
